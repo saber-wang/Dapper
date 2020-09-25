@@ -74,6 +74,11 @@ namespace Dapper
         public bool Pipelined => (Flags & CommandFlags.Pipelined) != 0;
 
         /// <summary>
+        /// set BindByName true
+        /// </summary>
+        public bool SetBindByName { get; set; }
+
+        /// <summary>
         /// Initialize the command definition
         /// </summary>
         /// <param name="commandText">The text for this command.</param>
@@ -94,6 +99,7 @@ namespace Dapper
             CommandTimeout = commandTimeout;
             CommandType = commandType;
             Flags = flags;
+            SetBindByName= true;
             CancellationToken = cancellationToken;
         }
 
@@ -110,7 +116,7 @@ namespace Dapper
         internal IDbCommand SetupCommand(IDbConnection cnn, Action<IDbCommand, object> paramReader)
         {
             var cmd = cnn.CreateCommand();
-            var init = GetInit(cmd.GetType());
+            var init = GetInit(cmd.GetType(), SetBindByName);
             init?.Invoke(cmd);
             if (Transaction != null)
                 cmd.Transaction = Transaction;
@@ -131,7 +137,7 @@ namespace Dapper
 
         private static SqlMapper.Link<Type, Action<IDbCommand>> commandInitCache;
 
-        private static Action<IDbCommand> GetInit(Type commandType)
+        private static Action<IDbCommand> GetInit(Type commandType,bool setBindByName)
         {
             if (commandType == null)
                 return null; // GIGO
@@ -148,7 +154,7 @@ namespace Dapper
                 var method = new DynamicMethod(commandType.Name + "_init", null, new Type[] { typeof(IDbCommand) });
                 var il = method.GetILGenerator();
 
-                if (bindByName != null)
+                if (bindByName != null&& setBindByName)
                 {
                     // .BindByName = true
                     il.Emit(OpCodes.Ldarg_0);
